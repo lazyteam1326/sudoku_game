@@ -7,13 +7,14 @@ import {
   generatePuzzle,
   isBoardComplete,
   getConflicts,
+  createEmptyBoard,
 } from './utils/sudoku';
 
 function App() {
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
-  const [initialBoard, setInitialBoard] = useState<Board>([]);
-  const [board, setBoard] = useState<Board>([]);
-  const [solution, setSolution] = useState<Board>([]);
+  const [initialBoard, setInitialBoard] = useState<Board>(createEmptyBoard());
+  const [board, setBoard] = useState<Board>(createEmptyBoard());
+  const [solution, setSolution] = useState<Board>(createEmptyBoard());
   const [selectedCell, setSelectedCell] = useState<[number, number] | null>(null);
   const [gameWon, setGameWon] = useState(false);
   const [timer, setTimer] = useState(0);
