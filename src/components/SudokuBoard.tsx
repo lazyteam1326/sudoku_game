@@ -1,12 +1,15 @@
 import React from 'react';
 import { Board, getConflicts } from '../utils/sudoku';
 
+type PencilMarks = Set<number>[][];
+
 interface SudokuBoardProps {
   board: Board;
   initialBoard: Board;
   selectedCell: [number, number] | null;
   onCellClick: (row: number, col: number) => void;
   showConflicts: boolean;
+  pencilMarks: PencilMarks;
 }
 
 const SudokuBoard: React.FC<SudokuBoardProps> = ({
@@ -15,6 +18,7 @@ const SudokuBoard: React.FC<SudokuBoardProps> = ({
   selectedCell,
   onCellClick,
   showConflicts,
+  pencilMarks,
 }) => {
   const getCellClasses = (row: number, col: number): string => {
     const isSelected = selectedCell && selectedCell[0] === row && selectedCell[1] === col;
@@ -75,6 +79,24 @@ const SudokuBoard: React.FC<SudokuBoardProps> = ({
     return classes;
   };
 
+  const renderPencilMarks = (row: number, col: number) => {
+    const marks = pencilMarks[row][col];
+    if (!marks || marks.size === 0) return null;
+
+    return (
+      <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 p-0.5">
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
+          <div
+            key={num}
+            className="flex items-center justify-center text-[8px] sm:text-[10px] text-gray-500 font-medium leading-none"
+          >
+            {marks.has(num) ? num : ''}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="inline-block bg-white rounded-lg shadow-lg overflow-hidden">
       <div className="grid grid-cols-9">
@@ -86,9 +108,13 @@ const SudokuBoard: React.FC<SudokuBoardProps> = ({
               onClick={() => onCellClick(rowIndex, colIndex)}
               style={{ width: 'clamp(32px, 8vw, 50px)', height: 'clamp(32px, 8vw, 50px)' }}
             >
-              <span className="text-sm sm:text-lg md:text-xl">
-                {cell !== null ? cell : ''}
-              </span>
+              {cell !== null ? (
+                <span className="text-sm sm:text-lg md:text-xl relative z-10">
+                  {cell}
+                </span>
+              ) : (
+                renderPencilMarks(rowIndex, colIndex)
+              )}
             </div>
           ))
         )}

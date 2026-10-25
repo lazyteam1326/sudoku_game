@@ -7,6 +7,7 @@ interface NumberPadProps {
   onHint: () => void;
   board: Board;
   disabled?: boolean;
+  isPencilMode?: boolean;
 }
 
 const NumberPad: React.FC<NumberPadProps> = ({
@@ -15,6 +16,7 @@ const NumberPad: React.FC<NumberPadProps> = ({
   onHint,
   board,
   disabled = false,
+  isPencilMode = false,
 }) => {
   return (
     <div className="flex flex-col gap-3">
@@ -33,7 +35,9 @@ const NumberPad: React.FC<NumberPadProps> = ({
                 transition-all duration-150
                 ${isComplete
                   ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                  : 'bg-white text-blue-600 hover:bg-blue-50 hover:shadow-md active:scale-95 shadow-sm border border-gray-200'
+                  : isPencilMode
+                    ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100 hover:shadow-md active:scale-95 shadow-sm border border-indigo-200'
+                    : 'bg-white text-blue-600 hover:bg-blue-50 hover:shadow-md active:scale-95 shadow-sm border border-gray-200'
                 }
               `}
             >

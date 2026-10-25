@@ -10,6 +10,14 @@ import {
   createEmptyBoard,
 } from './utils/sudoku';
 
+type PencilMarks = Set<number>[][];
+
+function createEmptyPencilMarks(): PencilMarks {
+  return Array(9).fill(null).map(() =>
+    Array(9).fill(null).map(() => new Set<number>())
+  );
+}
+
 function App() {
   const [difficulty, setDifficulty] = useState<Difficulty>('medium');
   const [initialBoard, setInitialBoard] = useState<Board>(createEmptyBoard());
@@ -22,6 +30,8 @@ function App() {
   const [mistakes, setMistakes] = useState(0);
   const [hintsUsed, setHintsUsed] = useState(0);
   const [showConflicts, setShowConflicts] = useState(true);
+  const [pencilMarks, setPencilMarks] = useState<PencilMarks>(createEmptyPencilMarks());
+  const [isPencilMode, setIsPencilMode] = useState(false);
 
   // Start a new game
   const startNewGame = useCallback((diff: Difficulty) => {
@@ -36,6 +46,8 @@ function App() {
     setMistakes(0);
     setHintsUsed(0);
     setDifficulty(diff);
+    setPencilMarks(createEmptyPencilMarks());
+    setIsPencilMode(false);
   }, []);
 
   // Initialize game on first load
@@ -67,25 +79,69 @@ function App() {
     setSelectedCell([row, col]);
   };
 
+  // Remove a pencil mark from related cells (same row, col, box) when a number is placed
+  const removePencilMarkFromRelated = (marks: PencilMarks, row: number, col: number, num: number): PencilMarks => {
+    const newMarks = marks.map(r => r.map(cell => new Set(cell)));
+
+    // Remove from same row
+    for (let c = 0; c < 9; c++) {
+      newMarks[row][c].delete(num);
+    }
+
+    // Remove from same column
+    for (let r = 0; r < 9; r++) {
+      newMarks[r][col].delete(num);
+    }
+
+    // Remove from same 3x3 box
+    const boxRow = Math.floor(row / 3) * 3;
+    const boxCol = Math.floor(col / 3) * 3;
+    for (let r = boxRow; r < boxRow + 3; r++) {
+      for (let c = boxCol; c < boxCol + 3; c++) {
+        newMarks[r][c].delete(num);
+      }
+    }
+
+    return newMarks;
+  };
+
   // Handle number input
   const handleNumberInput = (num: number) => {
     if (!selectedCell || gameWon) return;
     const [row, col] = selectedCell;
     if (initialBoard[row][col] !== null) return; // Can't modify initial cells
 
-    const newBoard = board.map(r => [...r]);
-    newBoard[row][col] = num;
-    setBoard(newBoard);
+    if (isPencilMode) {
+      // Toggle pencil mark
+      const newMarks = pencilMarks.map(r => r.map(cell => new Set(cell)));
+      if (newMarks[row][col].has(num)) {
+        newMarks[row][col].delete(num);
+      } else {
+        newMarks[row][col].add(num);
+      }
+      setPencilMarks(newMarks);
+    } else {
+      // Normal mode - place number
+      const newBoard = board.map(r => [...r]);
+      newBoard[row][col] = num;
+      setBoard(newBoard);
 
-    // Check if this is a mistake
-    if (solution[row][col] !== num) {
-      setMistakes(prev => prev + 1);
-    }
+      // Clear pencil marks for this cell and remove from related cells
+      let newMarks = pencilMarks.map(r => r.map(cell => new Set(cell)));
+      newMarks[row][col].clear();
+      newMarks = removePencilMarkFromRelated(newMarks, row, col, num);
+      setPencilMarks(newMarks);
 
-    // Check if game is complete
-    if (isBoardComplete(newBoard)) {
-      setGameWon(true);
-      setIsRunning(false);
+      // Check if this is a mistake
+      if (solution[row][col] !== num) {
+        setMistakes(prev => prev + 1);
+      }
+
+      // Check if game is complete
+      if (isBoardComplete(newBoard)) {
+        setGameWon(true);
+        setIsRunning(false);
+      }
     }
   };
 
@@ -95,9 +151,17 @@ function App() {
     const [row, col] = selectedCell;
     if (initialBoard[row][col] !== null) return;
 
-    const newBoard = board.map(r => [...r]);
-    newBoard[row][col] = null;
-    setBoard(newBoard);
+    if (isPencilMode) {
+      // Clear all pencil marks for this cell
+      const newMarks = pencilMarks.map(r => r.map(cell => new Set(cell)));
+      newMarks[row][col].clear();
+      setPencilMarks(newMarks);
+    } else {
+      // Clear the cell value
+      const newBoard = board.map(r => [...r]);
+      newBoard[row][col] = null;
+      setBoard(newBoard);
+    }
   };
 
   // Handle hint
@@ -111,6 +175,12 @@ function App() {
     newBoard[row][col] = solution[row][col];
     setBoard(newBoard);
     setHintsUsed(prev => prev + 1);
+
+    // Clear pencil marks for this cell and remove from related cells
+    let newMarks = pencilMarks.map(r => r.map(cell => new Set(cell)));
+    newMarks[row][col].clear();
+    newMarks = removePencilMarkFromRelated(newMarks, row, col, solution[row][col]!);
+    setPencilMarks(newMarks);
 
     // Check if game is complete
     if (isBoardComplete(newBoard)) {
@@ -129,30 +199,29 @@ function App() {
       } else if (e.key === 'Backspace' || e.key === 'Delete' || e.key === '0') {
         handleErase();
       } else if (e.key === 'ArrowUp' && selectedCell) {
+        e.preventDefault();
         const newRow = selectedCell[0] > 0 ? selectedCell[0] - 1 : 8;
         setSelectedCell([newRow, selectedCell[1]]);
       } else if (e.key === 'ArrowDown' && selectedCell) {
+        e.preventDefault();
         const newRow = selectedCell[0] < 8 ? selectedCell[0] + 1 : 0;
         setSelectedCell([newRow, selectedCell[1]]);
       } else if (e.key === 'ArrowLeft' && selectedCell) {
+        e.preventDefault();
         const newCol = selectedCell[1] > 0 ? selectedCell[1] - 1 : 8;
         setSelectedCell([selectedCell[0], newCol]);
       } else if (e.key === 'ArrowRight' && selectedCell) {
+        e.preventDefault();
         const newCol = selectedCell[1] < 8 ? selectedCell[1] + 1 : 0;
         setSelectedCell([selectedCell[0], newCol]);
+      } else if (e.key === 'p' || e.key === 'P') {
+        setIsPencilMode(prev => !prev);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedCell, board, gameWon]);
-
-  // Check if a cell has conflicts
-  const hasConflict = (row: number, col: number): boolean => {
-    if (board[row][col] === null) return false;
-    const conflicts = getConflicts(board, row, col);
-    return conflicts.length > 0;
-  };
+  }, [selectedCell, board, gameWon, isPencilMode, pencilMarks]);
 
   // Count filled cells
   const filledCells = board.flat().filter(cell => cell !== null).length;
@@ -187,7 +256,7 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col items-center justify-center px-4 py-6 gap-6">
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-6 gap-5">
         {/* Difficulty selector */}
         <div className="flex gap-2">
           {(['easy', 'medium', 'hard', 'expert'] as Difficulty[]).map((diff) => (
@@ -229,6 +298,7 @@ function App() {
             selectedCell={selectedCell}
             onCellClick={handleCellClick}
             showConflicts={showConflicts}
+            pencilMarks={pencilMarks}
           />
 
           {/* Win overlay */}
@@ -249,6 +319,24 @@ function App() {
           )}
         </div>
 
+        {/* Pencil Mode Toggle */}
+        <button
+          onClick={() => setIsPencilMode(prev => !prev)}
+          className={`
+            flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all
+            ${isPencilMode
+              ? 'bg-indigo-600 text-white shadow-md'
+              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+            }
+          `}
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+          </svg>
+          {isPencilMode ? 'Pencil Mode ON' : 'Pencil Mode'}
+          <span className="text-xs opacity-70">(P)</span>
+        </button>
+
         {/* Number Pad */}
         <NumberPad
           onNumberClick={handleNumberInput}
@@ -256,6 +344,7 @@ function App() {
           onHint={handleHint}
           board={board}
           disabled={gameWon}
+          isPencilMode={isPencilMode}
         />
 
         {/* Settings */}
@@ -290,7 +379,7 @@ function App() {
 
       {/* Footer */}
       <footer className="text-center py-3 text-xs text-gray-400">
-        Use keyboard arrows to navigate • Numbers 1-9 to fill • Backspace to erase
+        Arrow keys to navigate • 1-9 to fill • Backspace to erase • P to toggle pencil mode
       </footer>
     </div>
   );
